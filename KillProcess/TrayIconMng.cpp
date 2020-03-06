@@ -61,7 +61,7 @@ BOOL CTrayIconMng::AddTrayIcon(HWND hWnd)
     nid.hWnd = hWnd;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    sprintf((char*)nid.szTip, (char*)_T("TrayTest"));
+    sprintf((char*)nid.szTip, (char*)_T("KillProcess"));
     nid.uID = 0;
     nid.hIcon = LoadIcon(AfxGetInstanceHandle(), MAKEINTRESOURCE(IDI_MAIN_ICON));
 

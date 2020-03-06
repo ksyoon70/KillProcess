@@ -34,6 +34,9 @@
     <None Include="res\eye.bmp">
       <Filter>리소스 파일</Filter>
     </None>
+    <None Include="res\KillProcess3.ico">
+      <Filter>리소스 파일</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KillProcess.h">

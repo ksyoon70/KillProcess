@@ -56,6 +56,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Psapi.lib</AdditionalDependencies>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -83,6 +84,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Psapi.lib</AdditionalDependencies>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -103,6 +105,7 @@
     <None Include="res\KillProcess.ico" />
     <None Include="res\KillProcess.rc2" />
     <None Include="res\KillProcess2.ico" />
+    <None Include="res\KillProcess3.ico" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CheckableGroupBox.h" />
