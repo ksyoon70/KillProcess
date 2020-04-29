@@ -116,6 +116,7 @@ public:
 	CString m_dstUpdateAppPath;
 	afx_msg void OnBnClickedSrcBrowseFileBtn();
 	afx_msg void OnBnClickedDestBrowseFileBtn();
+	afx_msg LRESULT OnProcAliveFunc(WPARAM wParam, LPARAM lParam);
 	// 프로세스 업데이트 주기
 	UINT m_RefreshProcessTime;
 

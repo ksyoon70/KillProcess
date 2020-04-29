@@ -26,6 +26,8 @@
 #define WAKEUP_TIME_INDEX			(3)				//재 기동 할 시간
 #define PATH_NAME_INDEX				(4)
 
+#define WM_PROC_ALIVE			(WM_USER+200)	// 프로세스가 살아있음을 알림.
+
 // 응용 프로그램 정보에 사용되는 CAboutDlg 대화 상자입니다.
 
 class CAboutDlg : public CDialogEx
@@ -117,6 +119,7 @@ BEGIN_MESSAGE_MAP(CKillProcessDlg, CDialogEx)
 	ON_MESSAGE(WM_TRAYICON, OnTrayIcon)
 	ON_COMMAND(WM_APP_EXIT, OnAppExit)
 	ON_COMMAND(WM_DIALOG_SHOW, OnDialogShow)
+	ON_MESSAGE(WM_PROC_ALIVE, &CKillProcessDlg::OnProcAliveFunc)
 END_MESSAGE_MAP()
 
 
@@ -1520,28 +1523,12 @@ void CKillProcessDlg::SurveilProc(void)
 BOOL CKillProcessDlg::OnCopyData(CWnd* pWnd, COPYDATASTRUCT* pCopyDataStruct)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	TCHAR procname[MAX_PATH] = { 0,};
+	
 	m_pcds = (PCOPYDATASTRUCT)pCopyDataStruct;
 
 	CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
-	CopyMemory(procname,m_wdMsg.processName,m_wdMsg.strlen);
 
-	POSITION pos;
-	
-	for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
-	{
-		PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
-		if(pInfo)
-		{
-			//해당 프로세스를 찾으면 업데이트를 해준다.
-			if( _tcscmp(pInfo->execName, procname) == 0)
-			{
-				pInfo->curWaitSecond = 0;
-				break;
-			}
-		}
-		m_surveilList.GetNext(pos);
-	}
+	PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
 
 	return CDialogEx::OnCopyData(pWnd, pCopyDataStruct);
 }
@@ -1595,6 +1582,8 @@ void CKillProcessDlg::OnBnClickedDestBrowseFileBtn()
 	
 }
 
+
+
 //트레이 아이콘을 클릭했을 때의 메시지 핸들러
 long CKillProcessDlg::OnTrayIcon(WPARAM wParam, LPARAM lParam)
 {
@@ -1616,4 +1605,42 @@ void CKillProcessDlg::OnDialogShow(void)
 	else ShowWindow(true);			//숨겨진 상태라면 보이게
 	m_bHide = !m_bHide;
 	m_myTray.m_bHide = m_bHide;
+}
+
+/**
+*		@fn		LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
+*		@brief	WM 를 받으면 들어오는 함수 (콜백함수)
+*		@param	wParam : 연결에 대한 상태정보를 가지고 있다.
+*		@param	lParam : 연결 이외의 데이터를 가지고 있을 경우에 값이 존재한다.
+*		@remark	WM_COPYDATA 메시지 처리 콜백함수
+*/
+LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
+{
+	WATCHDOG_MSG *pWdMsg = (WATCHDOG_MSG *)wParam;
+	if(pWdMsg)
+	{
+		TCHAR procname[MAX_PATH] = { 0,};
+
+		CopyMemory(procname,pWdMsg->processName,pWdMsg->strlen);
+
+		POSITION pos;
+
+		for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
+		{
+			PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
+			if(pInfo)
+			{
+				//해당 프로세스를 찾으면 업데이트를 해준다.
+				if( _tcscmp(pInfo->execName, procname) == 0)
+				{
+					pInfo->curWaitSecond = 0;
+					break;
+				}
+			}
+			m_surveilList.GetNext(pos);
+		}
+	}
+	
+
+	return TRUE;
 }

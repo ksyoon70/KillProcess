@@ -68,6 +68,18 @@ BOOL CKillProcessApp::InitInstance()
 	// 적절한 내용으로 수정해야 합니다.
 	SetRegistryKey(_T("로컬 응용 프로그램 마법사에서 생성된 응용 프로그램"));
 
+	/// 동일한 프로세스가 실행 되지 않도록 코드 추가 by 윤경섭 2020.04.29
+	HANDLE hMutexOneInstance = ::CreateMutex( NULL, TRUE, _T("AFX_JWIS_KILLPROC_8DFF6919_58B7_11D6_8719_0008C79F2040")); 
+	bool AlreadyRunning = (GetLastError() == ERROR_ALREADY_EXISTS);
+
+	if(hMutexOneInstance != NULL) 
+		::ReleaseMutex(hMutexOneInstance); 
+
+	if(AlreadyRunning) {
+		//::MessageBox(NULL, _T("이미 프로그램이 실행중입니다."), _T("지역제어기"), MB_OK);
+		return FALSE;
+	}
+
 
 	if(GetModuleFileName(NULL, CGlobal::Program_PATH, 256) != 0) {                // 이 프로그램의 PATH를 구한다.
 		*(_tcsrchr(CGlobal::Program_PATH, _T('\\'))+1) = '\0';                           // FULL_PATH에서 프로그램 이름을 제거한 순수 PATH를 구한다.
