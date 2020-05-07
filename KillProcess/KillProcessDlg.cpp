@@ -674,6 +674,9 @@ BOOL CKillProcessDlg::KillProcess(CString ProcessName)
                     
 					TerminateProcess( hProcess, dwExitCode);
 					CloseHandle(hProcess);
+					TCHAR szLog[MAX_PATH];
+					_stprintf_s(szLog,_countof(szLog),_T("KillProcess %s\r\n"),ProcessName);
+					LSITS_Write_ProgramLogFile(szLog);
 					//return TRUE;
 				}
 
@@ -775,6 +778,10 @@ BOOL CKillProcessDlg::RunProcess(CString RunFilePath, int show)
 	// ÇÚµé ´Ý±â
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
+
+	TCHAR szLog[MAX_PATH];
+	_stprintf_s(szLog,_countof(szLog),_T("RunProcess %s\r\n"),RunFilePath);
+	LSITS_Write_ProgramLogFile(szLog);
 
 	return TRUE;
 }
