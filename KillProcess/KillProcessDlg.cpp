@@ -1537,10 +1537,12 @@ BOOL CKillProcessDlg::OnCopyData(CWnd* pWnd, COPYDATASTRUCT* pCopyDataStruct)
 	
 	m_pcds = (PCOPYDATASTRUCT)pCopyDataStruct;
 
-	CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
+	if(m_pcds->cbData == sizeof(WATCHDOG_MSG))
+	{
+		CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
 
-	PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
-
+		PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
+	}
 	return CDialogEx::OnCopyData(pWnd, pCopyDataStruct);
 }
 
@@ -1632,24 +1634,28 @@ LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
 	{
 		TCHAR procname[MAX_PATH] = { 0,};
 
-		CopyMemory(procname,pWdMsg->processName,pWdMsg->strlen);
-
-		POSITION pos;
-
-		for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
+		if(pWdMsg->strlen < sizeof(pWdMsg->processName))
 		{
-			PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
-			if(pInfo)
+			CopyMemory(procname,pWdMsg->processName,pWdMsg->strlen);
+
+			POSITION pos;
+
+			for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
 			{
-				//해당 프로세스를 찾으면 업데이트를 해준다.
-				if( _tcscmp(pInfo->execName, procname) == 0)
+				PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
+				if(pInfo)
 				{
-					pInfo->curWaitSecond = 0;
-					break;
+					//해당 프로세스를 찾으면 업데이트를 해준다.
+					if( _tcscmp(pInfo->execName, procname) == 0)
+					{
+						pInfo->curWaitSecond = 0;
+						break;
+					}
 				}
+				m_surveilList.GetNext(pos);
 			}
-			m_surveilList.GetNext(pos);
 		}
+		
 	}
 	
 
