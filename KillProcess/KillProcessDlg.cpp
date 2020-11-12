@@ -95,6 +95,7 @@ void CKillProcessDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX,IDC_SRC_UPDATE_PATH_EDIT,m_srcUpdateAppPath);
 	DDX_Text(pDX,IDC_DST_UPDATE_PATH_EDIT,m_dstUpdateAppPath);
 	DDX_Text(pDX,IDC_PROCESS_UPDATE_TIME_EDIT,m_RefreshProcessTime);
+	DDX_Control(pDX, IDC_VERSION, m_Version);
 }
 
 BEGIN_MESSAGE_MAP(CKillProcessDlg, CDialogEx)
@@ -252,6 +253,9 @@ BOOL CKillProcessDlg::OnInitDialog()
 
 	SetTimer(TIMER_NUM,m_RefreshProcessTime*1000,NULL);
 
+	TCHAR buf[100];
+	_stprintf_s(buf,_countof(buf),_T("%s"),PROGRAM_VERSION);
+	m_Version.SetWindowText(buf);
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
 

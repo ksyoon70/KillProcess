@@ -7,6 +7,7 @@
 #include "CheckListCtrl.h"
 #include "CheckableGroupBox.h"
 #include "TrayIconMng.h"
+#include "afxwin.h"
 
 /// 모니터링 프로세스를 하기 위한 구조체
 typedef struct _SURVEIL_PROC_INFO
@@ -131,4 +132,7 @@ public:
 private:
 	// 초기 트레이 상태
 	BOOL m_InitTray;
+public:
+	// 버전표시
+	CStatic m_Version;
 };
