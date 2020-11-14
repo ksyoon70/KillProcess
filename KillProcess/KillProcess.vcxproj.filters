@@ -69,6 +69,9 @@
     <ClInclude Include="CheckableGroupBox.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="XPtrList.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KillProcess.cpp">
@@ -93,6 +96,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="TrayIconMng.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="XPtrList.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

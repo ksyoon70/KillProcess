@@ -8,6 +8,7 @@
 #include "CheckableGroupBox.h"
 #include "TrayIconMng.h"
 #include "afxwin.h"
+#include "XPtrList.h"
 
 /// 모니터링 프로세스를 하기 위한 구조체
 typedef struct _SURVEIL_PROC_INFO
@@ -98,7 +99,7 @@ public:
 	void Write_INI(void);
 	afx_msg void OnBnClickedReadIniButton();
 	afx_msg void OnBnClickedWriteIniButton();
-	CPtrList m_surveilList;			//감시 리스트
+	CXPtrList m_surveilList;			//감시 리스트
 	// 감시 리스트를 업데이트 한다
 	void UpdateSurveilList(TCHAR *fullPathName, int param1 , int param2);
 	// 프로세스를 깨울 때 기다리는 시간 (초)
@@ -135,4 +136,5 @@ private:
 public:
 	// 버전표시
 	CStatic m_Version;
+	afx_msg void OnNMCustomdrawMonProcessList(NMHDR *pNMHDR, LRESULT *pResult);
 };

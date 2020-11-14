@@ -3,6 +3,8 @@
 extern void CreateDir(char* Path);
 extern void GetCurrentDate(char *return_Date);
 extern void LSITS_Write_ProgramLogFile(char *format, ...);
+extern void LSITS_Write_ErrorLogFile(char *format, ...);
+extern void LSITS_WriteExceptionFile(TCHAR *filename, DWORD line, DWORD dwError);
 
 class CGlobal
 {
@@ -18,5 +20,5 @@ public:
 	static BOOL GetPath(TCHAR *src, TCHAR *dst);
 };
 
-const static TCHAR *PROGRAM_VERSION =  _T("VER 1.00.20201112_2");
+const static TCHAR *PROGRAM_VERSION =  _T("VER 1.00.20201114_1");
 

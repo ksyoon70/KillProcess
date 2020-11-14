@@ -120,7 +120,6 @@ void LSITS_Write_ProgramLogFile(char *format, ...) {
 
 
 	char TempDate[20];
-	char TempHour[20];
 
 	GetCurrentDate(TempDate);
 
@@ -186,4 +185,110 @@ void LSITS_Write_ProgramLogFile(char *format, ...) {
 	fclose(openLogFile);
 
 	CriticalSection_ProgramLogFile.Unlock();
+}
+
+void LSITS_WriteExceptionFile(TCHAR *filename, DWORD line, DWORD dwError)
+{
+	HLOCAL hlocal = NULL;	
+	BOOL fOk = ::FormatMessage( 
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+		NULL, dwError, MAKELANGID(0, SUBLANG_ENGLISH_US),
+		(PTSTR)&hlocal,0,NULL);	
+	if(!fOk)
+	{
+		HMODULE hDll = LoadLibraryEx(TEXT("netmsg.dll"),NULL,DONT_RESOLVE_DLL_REFERENCES);
+		if(hDll !=NULL){	
+			::FormatMessage(
+				FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM,
+				hDll, dwError, MAKELANGID(0,SUBLANG_ENGLISH_US),
+				(PTSTR)&hlocal,0,NULL);
+			FreeLibrary(hDll);
+		}
+	}
+	LSITS_Write_ErrorLogFile("File: %s Line: %d Error Code: %d\r\n",filename,line,dwError);
+	if(hlocal != NULL)
+	{
+		LSITS_Write_ErrorLogFile((char*)LocalLock(hlocal),"\r\n");
+		LocalFree(hlocal);  //메모리 해제
+
+	}
+	else
+	{
+		LSITS_Write_ErrorLogFile(_T("Error number not found\r\n"));
+	}
+}
+
+CCriticalSection CriticalSection_ErrorLogFile;
+
+void LSITS_Write_ErrorLogFile(char *format, ...) {
+
+	CriticalSection_ErrorLogFile.Lock();
+
+
+	//----------------------------------------------------------------------------
+	char TempDate[20];
+
+	GetCurrentDate(TempDate);
+
+	char TempPath[MAX_PATH];
+	TCHAR fileFullPath[MAX_PATH];
+
+	_stprintf_s(TempPath, _countof(TempPath), _T("%s%s"), CGlobal::Program_PATH, _T("log"));
+	if(!PathIsDirectory(TempPath))
+	{
+		CreateDir(TempPath);
+	}
+
+	sprintf(fileFullPath, "%s\\error_%s.log",TempPath,TempDate,TempDate);
+
+	if(format == NULL) {
+		CriticalSection_ErrorLogFile.Unlock();
+		return;
+	}
+
+	//----------------------------------------------------------------------------
+	FILE *openLogFile;
+	va_list var_args;
+
+	time_t  now_time;
+	struct tm *today;
+	char szTimeStamp[50];
+
+	time(&now_time);
+	today = localtime(&now_time);
+	strftime(szTimeStamp, 30, "%Y-%m-%d %H:%M:%S", today);
+
+	// 1. 현재의 log파일을 open한다.(append mode로 open, 파일이 없으면 새로 생성)
+	if( (openLogFile = fopen(fileFullPath, "ab")) == NULL ) {
+		char drive[_MAX_DRIVE];
+		char dir[_MAX_DIR];
+		char fname[_MAX_FNAME];
+		char ext[_MAX_EXT];
+
+		_splitpath(fileFullPath, drive, dir, fname, ext);
+
+		// 디렉터리를 생성해준다.
+		char TmpPath[MAX_PATH];
+		sprintf(TmpPath, "%s%s", drive, dir);
+		TmpPath[strlen(TmpPath)-1] = NULL;
+		CreateDir(TmpPath);
+
+		if( (openLogFile = fopen(fileFullPath, "ab")) == NULL ) {
+			CriticalSection_ErrorLogFile.Unlock();
+			return;
+		}
+	}
+
+	// 2. 파일에 정보를 추가한다.
+	va_start( var_args, format);     // Initialize variable arguments.
+
+	fprintf( openLogFile, "[%s] ", szTimeStamp);
+	vfprintf( openLogFile, format, var_args);
+
+	va_end(var_args);              // Reset variable arguments.
+
+	// 3. open한 파일을 close.
+	fclose(openLogFile);
+
+	CriticalSection_ErrorLogFile.Unlock();
 }

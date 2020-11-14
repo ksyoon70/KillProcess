@@ -9,6 +9,7 @@
 #include <psapi.h>
 #include <TLHELP32.H>
 #include "Global.h"
+#include <excpt.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -121,6 +122,7 @@ BEGIN_MESSAGE_MAP(CKillProcessDlg, CDialogEx)
 	ON_COMMAND(WM_APP_EXIT, OnAppExit)
 	ON_COMMAND(WM_DIALOG_SHOW, OnDialogShow)
 	ON_MESSAGE(WM_PROC_ALIVE, &CKillProcessDlg::OnProcAliveFunc)
+	ON_NOTIFY(NM_CUSTOMDRAW, IDC_MON_PROCESS_LIST, &CKillProcessDlg::OnNMCustomdrawMonProcessList)
 END_MESSAGE_MAP()
 
 
@@ -196,7 +198,7 @@ BOOL CKillProcessDlg::OnInitDialog()
 	listOrder[4] = 4;
 
 	m_monProcList.SetColumnOrderArray(5, listOrder);
-	m_monProcList.SetExtendedStyle( m_monProcList.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES);
+	m_monProcList.SetExtendedStyle( m_monProcList.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_SUBITEMIMAGES | LVS_EX_DOUBLEBUFFER);
 	m_monProcList.Init();
 
 	m_UpdateAppUseGroupBox.SetTitleStyle(BS_AUTOCHECKBOX, FALSE);
@@ -537,9 +539,35 @@ void CKillProcessDlg::OnTimer(UINT_PTR nIDEvent)
 		m_InitTray = FALSE;
 	}
 	
-	UpdateProcess();
-	//죽은 프로세스가 있는지 확인한다.
-	SurveilProc();
+	try
+	{
+		UpdateProcess();
+		//죽은 프로세스가 있는지 확인한다.
+		SurveilProc();
+	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+
+	
 	SetTimer(nIDEvent,m_RefreshProcessTime*1000,NULL);
 	CDialogEx::OnTimer(nIDEvent);
 }
@@ -559,31 +587,56 @@ void CKillProcessDlg::UpdateProcess(void)
 	DWORD aProcesses[1024], cbNeeded, cProcesses;
 	unsigned int i;
 
-	if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )
+	try
 	{
-		return;
-	}
-
-
-	// Calculate how many process identifiers were returned.
-
-	cProcesses = cbNeeded / sizeof(DWORD);
-
-	if(cProcesses)
-	{
-		m_ProcList.DeleteAllItems();
-		m_listIndex = 0;
-	}
-
-	// Print the name and process identifier for each process.
-
-	for ( i = 0; i < cProcesses; i++ )
-	{
-		if( aProcesses[i] != 0 )
+		if ( !EnumProcesses( aProcesses, sizeof(aProcesses), &cbNeeded ) )
 		{
-			PrintProcessNameAndID(aProcesses[i] );
+			return;
+		}
+
+
+		// Calculate how many process identifiers were returned.
+
+		cProcesses = cbNeeded / sizeof(DWORD);
+
+		if(cProcesses)
+		{
+			m_ProcList.DeleteAllItems();
+			m_listIndex = 0;
+		}
+
+		// Print the name and process identifier for each process.
+
+		for ( i = 0; i < cProcesses; i++ )
+		{
+			if( aProcesses[i] != 0 )
+			{
+				PrintProcessNameAndID(aProcesses[i] );
+			}
 		}
 	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+	
 }
 
 /**
@@ -600,19 +653,43 @@ void CKillProcessDlg::OnLvnItemchangedProcList(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	POSITION pos = m_ProcList.GetFirstSelectedItemPosition();
-	if(pos != NULL) {
-		int nItem = 0;
-		while(pos) {
-			nItem = m_ProcList.GetNextSelectedItem(pos);
 
-			char TmpBuf[30];
-			m_ProcName = m_ProcList.GetItemText(nItem, 0);
-			m_ProcID = _ttoi(m_ProcList.GetItemText(nItem, 1));
-			UpdateData(FALSE);
-			break;
+	try
+	{
+		POSITION pos = m_ProcList.GetFirstSelectedItemPosition();
+		if(pos != NULL) {
+			int nItem = 0;
+			while(pos) {
+				nItem = m_ProcList.GetNextSelectedItem(pos);
+				m_ProcName = m_ProcList.GetItemText(nItem, 0);
+				m_ProcID = _ttoi(m_ProcList.GetItemText(nItem, 1));
+				UpdateData(FALSE);
+				break;
+			}
 		}
 	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+	
 
 	*pResult = 0;
 }
@@ -629,70 +706,96 @@ BOOL CKillProcessDlg::KillProcess(CString ProcessName)
 {
 	BOOL b = FALSE;
 	HANDLE   hSnapshot  = NULL;  
-    PROCESSENTRY32 pe32 = {0};  
+    PROCESSENTRY32 pe32 = {0}; 
 
-	// 시스템 프로세서의 상태(힙, 모듈, 스레드)를 읽어 온다.
-	// 성공하면 스냅샷에 대한 핸들을 반환하고, 실패하면 INVALID_HANDLE_VALUE를 반환한다. 
-    hSnapshot  = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );  
+	try
+	{
+		// 시스템 프로세서의 상태(힙, 모듈, 스레드)를 읽어 온다.
+		// 성공하면 스냅샷에 대한 핸들을 반환하고, 실패하면 INVALID_HANDLE_VALUE를 반환한다. 
+		hSnapshot  = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );  
 
-	// 엔트리 구조체 사이즈
-    pe32.dwSize = sizeof( PROCESSENTRY32 );
+		// 엔트리 구조체 사이즈
+		pe32.dwSize = sizeof( PROCESSENTRY32 );
 
-	// 엔트리에서 구성된 자료구조 가져오기
-    if( Process32First( hSnapshot , &pe32 ) )  
-    {  
-        do   
-        {  
-            // printf("%20s", pe32.szExeFile);  
-			if(ProcessName.Compare(pe32.szExeFile) == 0)
-			// if(strcmp(pe32.szExeFile, ProcessName) == 0)
-			{
-				b = TRUE;
-				printf("Process Found = %20s !!!\n", pe32.szExeFile);  
-				//AfxMessageBox("Found Process");
-				HANDLE hProcess = OpenProcess( PROCESS_TERMINATE , FALSE, pe32.th32ProcessID );
-				if( hProcess )
+		// 엔트리에서 구성된 자료구조 가져오기
+		if( Process32First( hSnapshot , &pe32 ) )  
+		{  
+			do   
+			{  
+				// printf("%20s", pe32.szExeFile);  
+				if(ProcessName.Compare(pe32.szExeFile) == 0)
+				// if(strcmp(pe32.szExeFile, ProcessName) == 0)
 				{
-					DWORD dwExitCode;
+					b = TRUE;
+					printf("Process Found = %20s !!!\n", pe32.szExeFile);  
+					//AfxMessageBox("Found Process");
+					HANDLE hProcess = OpenProcess( PROCESS_TERMINATE , FALSE, pe32.th32ProcessID );
+					if( hProcess )
+					{
+						DWORD dwExitCode;
                     
-                    /* 	BOOL WINAPI GetExitCodeProcess
-						( _In_  HANDLE  hProcess, _Out_ LPDWORD lpExitCode )
-					hProcess : 종료 코드를 받기 원하는 프로세스의 핸들
-                    PROCESS_QUERY_INFORMATION 또는 PROCESS_QUERY_LIMITED_INFORMATION
-					권한이 있어야 함.
+						/* 	BOOL WINAPI GetExitCodeProcess
+							( _In_  HANDLE  hProcess, _Out_ LPDWORD lpExitCode )
+						hProcess : 종료 코드를 받기 원하는 프로세스의 핸들
+						PROCESS_QUERY_INFORMATION 또는 PROCESS_QUERY_LIMITED_INFORMATION
+						권한이 있어야 함.
                     
-                    lpExitCode : 프로세스 종료 상태를 받을 변수에 대한 포인터
+						lpExitCode : 프로세스 종료 상태를 받을 변수에 대한 포인터
                     
-                    실패시 0을 반환*/
+						실패시 0을 반환*/
                   
-					GetExitCodeProcess( hProcess, &dwExitCode);
+						GetExitCodeProcess( hProcess, &dwExitCode);
                     
-                    /* BOOL WINAPI TerminateProcess
-					(_In_ HANDLE hProcess, _In_ uExitCode)
+						/* BOOL WINAPI TerminateProcess
+						(_In_ HANDLE hProcess, _In_ uExitCode)
                     
-                    hProcess : 종료할 프로세스의 핸들을 설정
-                    핸들의 접근 권한은 반드시 PROCESS_TERMINATE를 가져야 함.
+						hProcess : 종료할 프로세스의 핸들을 설정
+						핸들의 접근 권한은 반드시 PROCESS_TERMINATE를 가져야 함.
                     
-                    uExitCode : 프로세스 종료 코드를 설정
-                    통상적으로 정상 종료 인경우 0을 비정상 종료인경우 -1을 입력*/
+						uExitCode : 프로세스 종료 코드를 설정
+						통상적으로 정상 종료 인경우 0을 비정상 종료인경우 -1을 입력*/
                     
-					TerminateProcess( hProcess, dwExitCode);
-					CloseHandle(hProcess);
-					TCHAR szLog[MAX_PATH];
-					_stprintf_s(szLog,_countof(szLog),_T("KillProcess %s\r\n"),ProcessName);
-					LSITS_Write_ProgramLogFile(szLog);
-					//return TRUE;
-				}
+						TerminateProcess( hProcess, dwExitCode);
+						CloseHandle(hProcess);
+						TCHAR szLog[MAX_PATH];
+						_stprintf_s(szLog,_countof(szLog),_T("KillProcess %s\r\n"),ProcessName);
+						LSITS_Write_ProgramLogFile(szLog);
+						//return TRUE;
+					}
 
-			}
-        } while ( Process32Next( hSnapshot , &pe32 ) );  
-    }  
-    else  
-    {  
-        printf("???\n");
-    }  
+				}
+			} while ( Process32Next( hSnapshot , &pe32 ) );  
+		}  
+		else  
+		{  
+			printf("???\n");
+		}  
   
-    CloseHandle (hSnapshot ); 
+		CloseHandle (hSnapshot ); 
+	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+
+	
 	
 	return b;
 }
@@ -709,39 +812,65 @@ BOOL CKillProcessDlg::KillProcessPid(DWORD pid)
 {
 	BOOL b = FALSE;
 	HANDLE   hSnapshot  = NULL;  
-	PROCESSENTRY32 pe32 = {0};  
-	hSnapshot  = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );  
-	pe32.dwSize = sizeof( PROCESSENTRY32 );  
-	if( Process32First( hSnapshot , &pe32 ) )  
-	{  
-		do   
+	PROCESSENTRY32 pe32 = {0}; 
+	try
+	{
+		hSnapshot  = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );  
+		pe32.dwSize = sizeof( PROCESSENTRY32 );  
+		if( Process32First( hSnapshot , &pe32 ) )  
 		{  
-			//printf("%20s", pe32.szExeFile);  
-			if(pe32.th32ProcessID == pid)
-				//            if(strcmp(pe32.szExeFile, ProcessName) == 0)
-			{
-				b = TRUE;
-				printf("Process Found = %20s !!!\n", pe32.szExeFile);  
-				//AfxMessageBox("Found Process");
-				HANDLE hProcess = OpenProcess( PROCESS_TERMINATE , FALSE, pe32.th32ProcessID );
-				if( hProcess )
+			do   
+			{  
+				//printf("%20s", pe32.szExeFile);  
+				if(pe32.th32ProcessID == pid)
+					//            if(strcmp(pe32.szExeFile, ProcessName) == 0)
 				{
-					DWORD dwExitCode;
-					GetExitCodeProcess( hProcess, &dwExitCode);
-					TerminateProcess( hProcess, dwExitCode);
-					CloseHandle(hProcess);
-					//return TRUE;
+					b = TRUE;
+					printf("Process Found = %20s !!!\n", pe32.szExeFile);  
+					//AfxMessageBox("Found Process");
+					HANDLE hProcess = OpenProcess( PROCESS_TERMINATE , FALSE, pe32.th32ProcessID );
+					if( hProcess )
+					{
+						DWORD dwExitCode;
+						GetExitCodeProcess( hProcess, &dwExitCode);
+						TerminateProcess( hProcess, dwExitCode);
+						CloseHandle(hProcess);
+						//return TRUE;
+					}
+
 				}
+			} while ( Process32Next( hSnapshot , &pe32 ) );  
+		}  
+		else  
+		{  
+			printf("???\n");
+		}  
 
-			}
-		} while ( Process32Next( hSnapshot , &pe32 ) );  
-	}  
-	else  
-	{  
-		printf("???\n");
-	}  
+		CloseHandle (hSnapshot ); 
+	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
 
-	CloseHandle (hSnapshot ); 
+	
 
 	return b;
 }
@@ -758,34 +887,60 @@ BOOL CKillProcessDlg::KillProcessPid(DWORD pid)
 */
 BOOL CKillProcessDlg::RunProcess(CString RunFilePath, int show)
 {
-	// STARTUPINFO 생성하는 프로세스의 속성을 지정할 때 사용하는 구조체
-	STARTUPINFO si;
 
-	// 새로 생선된 프로세스와 스레드 정보가 있음
-	PROCESS_INFORMATION pi;
+	try
+	{
+		// STARTUPINFO 생성하는 프로세스의 속성을 지정할 때 사용하는 구조체
+		STARTUPINFO si;
 
-	si.cb				= sizeof(STARTUPINFO);
-	si.lpReserved		= NULL;
-	si.lpReserved2		= NULL;
-	si.cbReserved2		= 0;
-	si.lpDesktop		= NULL;
-	si.lpTitle			= NULL;
-	si.dwFlags			= STARTF_USESHOWWINDOW|STARTF_USESTDHANDLES;
-	si.dwX				= 0;
-	si.dwY				= 0;
-	si.dwFillAttribute	= 0;
-	si.wShowWindow		= show;
+		// 새로 생선된 프로세스와 스레드 정보가 있음
+		PROCESS_INFORMATION pi;
 
-	CreateProcess(NULL,RunFilePath.GetBuffer(0),NULL,NULL,TRUE, NULL,NULL,NULL,&si,&pi);
+		si.cb				= sizeof(STARTUPINFO);
+		si.lpReserved		= NULL;
+		si.lpReserved2		= NULL;
+		si.cbReserved2		= 0;
+		si.lpDesktop		= NULL;
+		si.lpTitle			= NULL;
+		si.dwFlags			= STARTF_USESHOWWINDOW|STARTF_USESTDHANDLES;
+		si.dwX				= 0;
+		si.dwY				= 0;
+		si.dwFillAttribute	= 0;
+		si.wShowWindow		= show;
 
-	// WaitForSingleObject(pi.hProcess, INFINITE);
-	// 핸들 닫기
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
+		CreateProcess(NULL,RunFilePath.GetBuffer(0),NULL,NULL,TRUE, NULL,NULL,NULL,&si,&pi);
 
-	TCHAR szLog[MAX_PATH];
-	_stprintf_s(szLog,_countof(szLog),_T("RunProcess %s\r\n"),RunFilePath);
-	LSITS_Write_ProgramLogFile(szLog);
+		// WaitForSingleObject(pi.hProcess, INFINITE);
+		// 핸들 닫기
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+
+		TCHAR szLog[MAX_PATH];
+		_stprintf_s(szLog,_countof(szLog),_T("RunProcess %s\r\n"),RunFilePath);
+		LSITS_Write_ProgramLogFile(szLog);
+	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+	
 
 	return TRUE;
 }
@@ -823,7 +978,7 @@ void CKillProcessDlg::OnBnClickedBrowseFileBtn()
 void CKillProcessDlg::OnBnClickedMonProcRemoveButton()
 {
 	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-	POSITION pos,pos1;
+	POSITION pos;
 
 	TCHAR fullPath[MAX_PATH];
 	TCHAR path[MAX_PATH];
@@ -1465,61 +1620,121 @@ void CKillProcessDlg::SurveilProc(void)
 {
 	POSITION pos;
 	TCHAR filename[MAX_PATH];
-	for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
+	int fIndex = 0;
+	try
 	{
-		PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
-		if(pInfo)
+		for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
 		{
-			BOOL find = FALSE;
-			for(int index = 0; index < m_ProcList.GetItemCount();index++)
+			PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
+			if(pInfo)
 			{
-				m_ProcList.GetItemText(index,0,filename, _countof(filename));
-				if( _tcscmp(pInfo->execName, filename) == 0)
-				{
-					find = TRUE;
-				}
-			}
-			//이전 값 백업
-			pInfo->oldActive = pInfo->isActive;
-			if(find)
-			{
+				BOOL find = FALSE;
 				
-				pInfo->isActive = TRUE;
-				pInfo->curWakupSecond = 0;
-
-				if(pInfo->useWatchdog == TRUE)
+				for(int index = 0; index < m_ProcList.GetItemCount();index++)
 				{
-					pInfo->curWaitSecond += m_RefreshProcessTime*1000;
-					if(pInfo->maxWaitSec*1000 <= pInfo->curWaitSecond)
+					m_ProcList.GetItemText(index,0,filename, _countof(filename));
+					if( _tcscmp(pInfo->execName, filename) == 0)
 					{
-						//프로세스를 죽인다.
-						KillProcess(pInfo->execName);
-						pInfo->curWaitSecond = 0;  //죽이면... watchdog 카운트 초기화
+						find = TRUE;
+						break;
 					}
 				}
-			}
-			else
-			{
-				pInfo->isActive =FALSE;
-				//프로세스가 삭제되었으면... 재 기동 여부를 확인한다.
-				if(pInfo->oldActive == TRUE)
+				//이전 값 백업
+				pInfo->oldActive = pInfo->isActive;
+				if(find)
 				{
+					//프로세스가 살아 있으면...
+					pInfo->isActive = TRUE;
 					pInfo->curWakupSecond = 0;
+
+					if(pInfo->useWatchdog == TRUE)
+					{
+						pInfo->curWaitSecond += m_RefreshProcessTime*1000;
+						if(pInfo->maxWaitSec*1000 <= pInfo->curWaitSecond)
+						{
+							//프로세스를 죽인다.
+							KillProcess(pInfo->execName);
+							pInfo->curWaitSecond = 0;  //죽이면... watchdog 카운트 초기화
+						}
+						/*
+						RECT rcItem;
+						m_monProcList.GetItemRect(fIndex,&rcItem,LVIR_BOUNDS);
+						m_monProcList.InvalidateRect(&rcItem,TRUE);*/
+						//실제 모니터 리스트에서 해당 row를 찾아 업데이트 해주어야 한다.
+						/*
+						for(int iter = 0; iter < m_monProcList.GetItemCount();iter++)
+						{
+							m_monProcList.GetItemText(iter,1,filename, _countof(filename));
+							if( _tcscmp(pInfo->execName, filename) == 0)
+							{
+								m_monProcList.SetItemText(iter,1,filename);
+								break;
+							}
+						}*/
+
+					}
 				}
 				else
 				{
-					pInfo->curWakupSecond +=  m_RefreshProcessTime*1000;
-
-					if(pInfo->wakeupTime*1000 <= pInfo->curWakupSecond)
+					pInfo->isActive =FALSE;
+					//프로세스가 삭제되었으면... 재 기동 여부를 확인한다.
+					if(pInfo->oldActive == TRUE)
 					{
-						//프로세스를 살린다.
-						RunProcess(pInfo->execFullPath);
+						//막 삭제 된 경우
+						pInfo->curWakupSecond = 0;
+					}
+					else
+					{
+						pInfo->curWakupSecond +=  m_RefreshProcessTime*1000;
+
+						if(pInfo->wakeupTime*1000 <= pInfo->curWakupSecond)
+						{
+							//프로세스를 살린다.
+							RunProcess(pInfo->execFullPath);
+						}
+					}
+					
+				}
+
+				if(pInfo->useWatchdog == TRUE)
+				{
+					for(int iter = 0; iter < m_monProcList.GetItemCount();iter++)
+					{
+						m_monProcList.GetItemText(iter,1,filename, _countof(filename));
+						if( _tcscmp(pInfo->execName, filename) == 0)
+						{
+							m_monProcList.SetItemText(iter,1,filename);
+							break;
+						}
 					}
 				}
 			}
+			m_surveilList.GetNext(pos);
+			fIndex++;
 		}
-		m_surveilList.GetNext(pos);
 	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+
 }
 /**
 * @author 윤경섭
@@ -1534,15 +1749,40 @@ void CKillProcessDlg::SurveilProc(void)
 BOOL CKillProcessDlg::OnCopyData(CWnd* pWnd, COPYDATASTRUCT* pCopyDataStruct)
 {
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	
-	m_pcds = (PCOPYDATASTRUCT)pCopyDataStruct;
-
-	if(m_pcds->cbData == sizeof(WATCHDOG_MSG))
+	try
 	{
-		CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
+		m_pcds = (PCOPYDATASTRUCT)pCopyDataStruct;
 
-		PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
+		if(m_pcds->cbData == sizeof(WATCHDOG_MSG))
+		{
+			CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
+
+			PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
+		}
 	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+	
+	
 	return CDialogEx::OnCopyData(pWnd, pCopyDataStruct);
 }
 
@@ -1634,30 +1874,143 @@ LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
 	{
 		TCHAR procname[MAX_PATH] = { 0,};
 
-		if(pWdMsg->strlen < sizeof(pWdMsg->processName))
+		try
 		{
-			CopyMemory(procname,pWdMsg->processName,pWdMsg->strlen);
 
-			POSITION pos;
-
-			for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
+			if(pWdMsg->strlen < sizeof(pWdMsg->processName))
 			{
-				PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
-				if(pInfo)
+				CopyMemory(procname,pWdMsg->processName,pWdMsg->strlen);
+
+				POSITION pos;
+
+				for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
 				{
-					//해당 프로세스를 찾으면 업데이트를 해준다.
-					if( _tcscmp(pInfo->execName, procname) == 0)
+					PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
+					if(pInfo)
 					{
-						pInfo->curWaitSecond = 0;
-						break;
+						//해당 프로세스를 찾으면 업데이트를 해준다.
+						if( _tcscmp(pInfo->execName, procname) == 0)
+						{
+							pInfo->curWaitSecond = 0;
+
+							if(pInfo->useWatchdog == TRUE)
+							{
+								for(int iter = 0; iter < m_monProcList.GetItemCount();iter++)
+								{
+									m_monProcList.GetItemText(iter,1,procname, _countof(procname));
+									if( _tcscmp(pInfo->execName, procname) == 0)
+									{
+										m_monProcList.SetItemText(iter,1,procname);
+										break;
+									}
+								}
+							}
+
+							break;
+						}
 					}
+					m_surveilList.GetNext(pos);
 				}
-				m_surveilList.GetNext(pos);
 			}
 		}
-		
+		catch (CMemoryException* e)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			TCHAR szException[1024] = {0, };
+			e->GetErrorMessage(szException,sizeof(szException));
+			LSITS_Write_ErrorLogFile(szException);
+		}
+		catch (CException* e)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			TCHAR szException[1024] = {0, };
+			e->GetErrorMessage(szException,sizeof(szException));
+			LSITS_Write_ErrorLogFile(szException);
+		}
+		catch(...)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		}
+
 	}
 	
 
 	return TRUE;
+}
+
+void CKillProcessDlg::OnNMCustomdrawMonProcessList(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMCUSTOMDRAW pNMCD = reinterpret_cast<LPNMCUSTOMDRAW>(pNMHDR);
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	if(pNMCD->dwDrawStage == CDDS_PREPAINT){
+		*pResult = (LRESULT)CDRF_NOTIFYITEMDRAW; 
+		//*pResult = CDRF_NOTIFYPOSTERASE | CDRF_NOTIFYPOSTPAINT | CDRF_NOTIFYITEMDRAW | CDRF_NOTIFYSUBITEMDRAW;
+		return; // 여기서 함수를 빠져 나가야 *pResult 값이 유지된다.
+	}
+	if(pNMCD->dwDrawStage == CDDS_ITEMPREPAINT){ 
+
+        // 한 줄 (row) 가 그려질 때. 여기서만 설정하면 한 줄이 모두 동일하게 설정이 된다.
+		if(m_monProcList.GetItemData(pNMCD->dwItemSpec) == 0){//dwItemSpec 이 현재 그려지는 row index
+			NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR); 
+ 			pDraw->clrText = 0x0; 
+			pDraw->clrTextBk = 0xffffff; 
+			//*pResult = (LRESULT)CDRF_NEWFONT;//여기서 나가면 sub-item 이 변경되지 않는다.
+			*pResult = (LRESULT)CDRF_NOTIFYSUBITEMDRAW;//sub-item 을 변경하기 위해서. 
+			return;//여기서 중단해야 *pResult 값이 유지된다.
+		}
+		else{ // When all matrices are already made. 
+			NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR); 
+ 			pDraw->clrText = 0x0; 
+			pDraw->clrTextBk = RGB(255,255,196);  
+			*pResult = (LRESULT)CDRF_NEWFONT; 
+			return; 
+		}
+	}
+	else if(pNMCD->dwDrawStage == (CDDS_SUBITEM | CDDS_ITEMPREPAINT)){	
+                // sub-item 이 그려지는 순간. 위에서 *pResult 에 CDRF_NOTIFYSUBITEMDRAW 를 해서 여기로
+
+                // 올 수 있었던 것이다.
+
+		NMLVCUSTOMDRAW *pDraw = (NMLVCUSTOMDRAW*)(pNMHDR); 
+		CString text= m_monProcList.GetItemText(pNMCD->dwItemSpec, pDraw->iSubItem); 
+
+		POSITION pos;
+
+		for(pos = m_surveilList.GetHeadPosition(); pos != NULL;)
+		{
+			PSURVEIL_PROC_INFO pInfo = (PSURVEIL_PROC_INFO)m_surveilList.GetAt(pos);
+			if(pInfo)
+			{
+				//해당 프로세스를 찾으면 업데이트를 해준다.
+				if( _tcscmp(pInfo->execName, text) == 0 && pDraw->iSubItem == 1)
+				{
+					if(pInfo->useWatchdog == TRUE &&  pInfo->isActive == TRUE && pInfo->curWaitSecond <= 1000)
+					{
+						pDraw->clrText = 0xff; //붉은 색으로
+						pDraw->clrTextBk = 0xffffff; 
+					}
+					else
+					{
+						pDraw->clrText = 0x0; 
+						pDraw->clrTextBk = 0xffffff; 
+					}
+					break;
+				}
+				else
+				{
+					pDraw->clrText = 0x0; 
+					pDraw->clrTextBk = 0xffffff; 
+				}
+			}
+			m_surveilList.GetNext(pos);
+		}
+		
+		*pResult = (LRESULT)CDRF_NEWFONT; // 이렇게 해야 설정한 대로 그려진다.
+		return;
+	}
+
+	*pResult = 0;
 }
