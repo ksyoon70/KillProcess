@@ -123,6 +123,7 @@ BEGIN_MESSAGE_MAP(CKillProcessDlg, CDialogEx)
 	ON_COMMAND(WM_DIALOG_SHOW, OnDialogShow)
 	ON_MESSAGE(WM_PROC_ALIVE, &CKillProcessDlg::OnProcAliveFunc)
 	ON_NOTIFY(NM_CUSTOMDRAW, IDC_MON_PROCESS_LIST, &CKillProcessDlg::OnNMCustomdrawMonProcessList)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -268,7 +269,7 @@ void CKillProcessDlg::OnSysCommand(UINT nID, LPARAM lParam)
 		CAboutDlg dlgAbout;
 		dlgAbout.DoModal();
 	}
-	else if (nID == SC_MINIMIZE)
+	else if (nID == SC_MINIMIZE || nID == SC_CLOSE)
 	{
 		OnDialogShow();
 	}
@@ -531,10 +532,12 @@ void CKillProcessDlg::OnTimer(UINT_PTR nIDEvent)
 	///초기화 시에 일정 시간이 지나면 tray icon으로 변경
 	if(m_InitTray)
 	{
-		if(m_bHide == FALSE)
+
+		//처음에 작아지는 것 삭제
+		/*/if(m_bHide == FALSE)
 		{
 			OnDialogShow();
-		}
+		}*/
 	
 		m_InitTray = FALSE;
 	}
@@ -2014,3 +2017,4 @@ void CKillProcessDlg::OnNMCustomdrawMonProcessList(NMHDR *pNMHDR, LRESULT *pResu
 
 	*pResult = 0;
 }
+

@@ -20,5 +20,5 @@ public:
 	static BOOL GetPath(TCHAR *src, TCHAR *dst);
 };
 
-const static TCHAR *PROGRAM_VERSION =  _T("VER 1.00.20201114_1");
+const static TCHAR *PROGRAM_VERSION =  _T("VER 1.00.20201229_1");
 
