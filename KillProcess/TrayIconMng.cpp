@@ -102,8 +102,8 @@ void CTrayIconMng::ProcTrayMsg(HWND hWnd, WPARAM wParam, LPARAM lParam)
 BOOL CTrayIconMng::AddTrayIcon(HWND hWnd)
 {
 	try{
-		if(m_bAdded)		//이미 트레이 아이콘이 있다면 종료
-			return FALSE;
+		//if(m_bAdded)		//이미 트레이 아이콘이 있다면 종료
+		//	return FALSE;
 
 		NOTIFYICONDATA nid;	//아이콘을 생성하여 설정
 		ZeroMemory(&nid, sizeof(NOTIFYICONDATA));

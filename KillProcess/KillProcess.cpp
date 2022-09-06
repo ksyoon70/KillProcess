@@ -18,7 +18,6 @@ BEGIN_MESSAGE_MAP(CKillProcessApp, CWinApp)
 	ON_COMMAND(ID_HELP, &CWinApp::OnHelp)
 END_MESSAGE_MAP()
 
-
 // CKillProcessApp 생성
 
 CKillProcessApp::CKillProcessApp()
@@ -90,7 +89,6 @@ BOOL CKillProcessApp::InitInstance()
 		::MessageBox(NULL, _T("프로그램위치를 구할수 없습니다."), _T("지역제어기"), MB_OK);
 		return FALSE;
 	}
-
 
 	CKillProcessDlg dlg;
 	m_pMainWnd = &dlg;

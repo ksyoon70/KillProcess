@@ -63,8 +63,6 @@ END_MESSAGE_MAP()
 // CKillProcessDlg 대화 상자
 
 
-
-
 CKillProcessDlg::CKillProcessDlg(CWnd* pParent /*=NULL*/)
 	: CDialogEx(CKillProcessDlg::IDD, pParent)
 	, m_ProcName(_T(""))
@@ -254,13 +252,14 @@ BOOL CKillProcessDlg::OnInitDialog()
 	UpdateProcess();
 
 	m_myTray.m_bHide = m_bHide;
-	m_myTray.AddTrayIcon(GetSafeHwnd());	//시작과 동시에 트레이 아이콘 표시
+	//m_myTray.AddTrayIcon(GetSafeHwnd());	//시작과 동시에 트레이 아이콘 표시
 
 	SetTimer(TIMER_NUM,m_RefreshProcessTime*1000,NULL);
 
 	TCHAR buf[100];
 	_stprintf_s(buf,_countof(buf),_T("%s"),PROGRAM_VERSION);
 	m_Version.SetWindowText(buf);
+
 	return TRUE;  // 포커스를 컨트롤에 설정하지 않으면 TRUE를 반환합니다.
 }
 
@@ -277,6 +276,7 @@ void CKillProcessDlg::OnSysCommand(UINT nID, LPARAM lParam)
 	//if (nID == SC_MINIMIZE || nID == SC_CLOSE)
 	if (nID == SC_CLOSE) //아이콘을 클릭하면 Minimizse 되면서 tray icon으로 바뀌는 문제 수정
 	{
+		
 		OnDialogShow();
 	}
 	else
@@ -667,8 +667,9 @@ void CKillProcessDlg::OnTimer(UINT_PTR nIDEvent)
 void CKillProcessDlg::UpdateProcess(void)
 {
 
-	DWORD aProcesses[1024], cbNeeded, cProcesses;
+	DWORD aProcesses[2048], cbNeeded, cProcesses;
 	unsigned int i;
+	UINT maxProcessLen  = sizeof(aProcesses)/sizeof(DWORD);
 
 	try
 	{
@@ -692,10 +693,14 @@ void CKillProcessDlg::UpdateProcess(void)
 
 		for ( i = 0; i < cProcesses; i++ )
 		{
-			if( aProcesses[i] != 0 )
+			if(i < maxProcessLen)
 			{
-				PrintProcessNameAndID(aProcesses[i] );
+				if( aProcesses[i] != 0 )
+				{
+					PrintProcessNameAndID(aProcesses[i] );
+				}
 			}
+			
 		}
 	}
 	catch (CMemoryException* e)
@@ -2243,13 +2248,24 @@ void CKillProcessDlg::OnAppExit(void)
 }
 
 //트레이 아이콘 보이기/숨기기 메뉴 메시지 핸들러
-void CKillProcessDlg::OnDialogShow(void)
+void CKillProcessDlg::OnDialogShow()
 {
 	try{
-		if(!m_bHide) ShowWindow(false);	//보이는 상태라면 숨기고
-		else ShowWindow(true);			//숨겨진 상태라면 보이게
-		m_bHide = !m_bHide;
-		m_myTray.m_bHide = m_bHide;
+		if(m_myTray.m_bHide == FALSE)
+		{
+			m_myTray.AddTrayIcon(GetSafeHwnd());
+			ShowWindow(false);	//보이는 상태라면 숨기고
+			m_myTray.m_bHide = TRUE;
+		}
+		else if(m_myTray.m_bHide == TRUE)
+		{
+			ShowWindow(true);			//숨겨진 상태라면 보이게
+			m_myTray.DelTrayIcon(GetSafeHwnd());
+			m_myTray.m_bHide = FALSE;
+		}
+		else
+		{
+		}
 	}
 	catch (CMemoryException* e)
 	{
@@ -2452,3 +2468,40 @@ void CKillProcessDlg::OnNMCustomdrawMonProcessList(NMHDR *pNMHDR, LRESULT *pResu
 	*pResult = 0;
 }
 
+
+
+void CKillProcessDlg::OnClose()
+{
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+	try{
+		m_myTray.DelTrayIcon(GetSafeHwnd());
+		LSITS_Write_ProgramLogFile(_T("Program closed \r\n"));
+	}
+	catch (CMemoryException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch (CException* e)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		TCHAR szException[1024] = {0, };
+		e->GetErrorMessage(szException,sizeof(szException));
+		LSITS_Write_ErrorLogFile(szException);
+	}
+	catch(...)
+	{
+		DWORD dwError = GetLastError();
+		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+	}
+	CDialogEx::OnClose();
+}
+
+CKillProcessDlg::~CKillProcessDlg()
+{
+
+}
