@@ -30,7 +30,7 @@
 #define WM_PROC_ALIVE			(WM_USER+200)	// 프로세스가 살아있음을 알림.
 
 // 응용 프로그램 정보에 사용되는 CAboutDlg 대화 상자입니다.
-
+UINT DelDataThreadFunc(LPVOID lpParam);	
 class CAboutDlg : public CDialogEx
 {
 public:
@@ -79,6 +79,17 @@ CKillProcessDlg::CKillProcessDlg(CWnd* pParent /*=NULL*/)
 	m_listIndex = 0;
 	m_ProcID = 0;
 
+	m_LogFileSaveInterval = 0;
+
+	m_hDelEvent = CreateEvent( NULL, FALSE, FALSE, NULL );
+
+	is_DEL_Run = FALSE;
+
+	CTime now = CTime::GetCurrentTime();
+	oldDay = now.GetDay();  //날짜 초기화
+
+	CreateThead();
+
 }
 
 void CKillProcessDlg::DoDataExchange(CDataExchange* pDX)
@@ -95,6 +106,7 @@ void CKillProcessDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Text(pDX,IDC_DST_UPDATE_PATH_EDIT,m_dstUpdateAppPath);
 	DDX_Text(pDX,IDC_PROCESS_UPDATE_TIME_EDIT,m_RefreshProcessTime);
 	DDX_Control(pDX, IDC_VERSION, m_Version);
+	DDX_Text(pDX, IDC_LOGFILE_SAVEDAY_EDIT, m_LogFileSaveInterval);
 }
 
 BEGIN_MESSAGE_MAP(CKillProcessDlg, CDialogEx)
@@ -145,7 +157,7 @@ BOOL CKillProcessDlg::OnInitDialog()
 	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
 	ASSERT(IDM_ABOUTBOX < 0xF000);
 
-	LSITS_Write_ProgramLogFile(_T("Program start \r\n"));
+	LSITS_Write_LogFile(LOG_PROG,_T("Program start \r\n"));
 
 	CMenu* pSysMenu = GetSystemMenu(FALSE);
 	if (pSysMenu != NULL)
@@ -221,13 +233,13 @@ BOOL CKillProcessDlg::OnInitDialog()
 				if ( CopyFile(CGlobal::srcUpdatePath , CGlobal::dstUpdatePath, false) == 0 ) {
 					TCHAR szError[500];
 					_stprintf_s(szError,_countof(szError),_T("copy %s ==> %s error\r\n"),CGlobal::srcUpdatePath,CGlobal::dstUpdatePath);
-					LSITS_Write_ProgramLogFile(szError);
+					LSITS_Write_LogFile(LOG_ERROR,szError);
 				}
 				else
 				{
 					TCHAR szLog[500];
 					_stprintf_s(szLog,_countof(szLog),_T("copy %s ==> %s OK!\r\n"),CGlobal::srcUpdatePath,CGlobal::dstUpdatePath);
-					LSITS_Write_ProgramLogFile(szLog);
+					LSITS_Write_LogFile(LOG_PROG,szLog);
 				}
 			}
 			else
@@ -236,13 +248,13 @@ BOOL CKillProcessDlg::OnInitDialog()
 				if ( CopyFile(CGlobal::srcUpdatePath , CGlobal::dstUpdatePath, false) == 0 ) {
 					TCHAR szError[500];
 					_stprintf_s(szError,_countof(szError),_T("copy %s ==> %s error\r\n"),CGlobal::srcUpdatePath,CGlobal::dstUpdatePath);
-					LSITS_Write_ProgramLogFile(szError);
+					LSITS_Write_LogFile(LOG_ERROR,szError);
 				}
 				else
 				{
 					TCHAR szLog[500];
 					_stprintf_s(szLog,_countof(szLog),_T("copy %s ==> %s OK!\r\n"),CGlobal::srcUpdatePath,CGlobal::dstUpdatePath);
-					LSITS_Write_ProgramLogFile(szLog);
+					LSITS_Write_LogFile(LOG_PROG,szLog);
 				}
 			}
 			
@@ -609,6 +621,14 @@ void CKillProcessDlg::OnTimer(UINT_PTR nIDEvent)
 	//프로세스를 갱신한다.
 	KillTimer(nIDEvent);
 
+
+	CTime NowTime = CTime::GetCurrentTime();
+	if(NowTime.GetHour() == 0 && NowTime.GetDay() != oldDay) //날짜가 바뀌었다.
+	{
+		oldDay = NowTime.GetDay();
+		SetEvent(m_hDelEvent);  // 파일 삭제 쓰레드를 부른다.
+	}
+	
 	///초기화 시에 일정 시간이 지나면 tray icon으로 변경
 	if(m_InitTray)
 	{
@@ -847,7 +867,7 @@ BOOL CKillProcessDlg::KillProcess(CString ProcessName)
 						CloseHandle(hProcess);
 						TCHAR szLog[MAX_PATH];
 						_stprintf_s(szLog,_countof(szLog),_T("KillProcess %s\r\n"),ProcessName);
-						LSITS_Write_ProgramLogFile(szLog);
+						LSITS_Write_LogFile(LOG_PROG,szLog);
 						//return TRUE;
 					}
 
@@ -1005,7 +1025,7 @@ BOOL CKillProcessDlg::RunProcess(CString RunFilePath, int show)
 
 		TCHAR szLog[MAX_PATH];
 		_stprintf_s(szLog,_countof(szLog),_T("RunProcess %s\r\n"),RunFilePath);
-		LSITS_Write_ProgramLogFile(szLog);
+		LSITS_Write_LogFile(LOG_PROG,szLog);
 	}
 	catch (CMemoryException* e)
 	{
@@ -1442,6 +1462,9 @@ void CKillProcessDlg::OnBnClickedMonProcModifyButton()
 void CKillProcessDlg::OnDestroy()
 {
 	CDialogEx::OnDestroy();
+	
+
+	StopThread();
 
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 	try{
@@ -1454,6 +1477,12 @@ void CKillProcessDlg::OnDestroy()
 			pos1 = pos;
 			m_surveilList.GetNext(pos);
 			m_surveilList.RemoveAt(pos1);
+		}
+		DWORD ncnt;
+		ncnt = m_RemoveDirList.GetCount();
+		if(ncnt)
+		{
+			m_RemoveDirList.RemoveAll();
 		}
 	}
 	catch (CMemoryException* e)
@@ -1515,6 +1544,8 @@ void CKillProcessDlg::Read_INI(void)
 		CGlobal::REALTIME_MON_PROC_COUNT =  GetPrivateProfileInt(_T("CONFIG"),_T("REALTIME_MONITOR_PROC_COUNT"),0,CGlobal::PROGRAM_INI_FULLPATH);
 		//타이머 업데이트 주기
 		m_RefreshProcessTime = GetPrivateProfileInt(_T("CONFIG"),_T("REFRESH_PROC_TIME"),DEFAULT_UPDATE_TIME,CGlobal::PROGRAM_INI_FULLPATH);
+
+		CGlobal::INI_LOGFILE_SAVE_INTERVAL = GetPrivateProfileInt(_T("DEBUG_LOG"), _T("LOG_COGNITION_SAVE_INTERVAL"), 10, CGlobal::PROGRAM_INI_FULLPATH);
 
 		for(int i = 0; i < CGlobal::REALTIME_MON_PROC_COUNT;  i++)
 		{
@@ -1648,6 +1679,8 @@ void CKillProcessDlg::Read_INI(void)
 		m_srcUpdateAppPath.Format(_T("%s"),CGlobal::srcUpdatePath);
 		GetPrivateProfileString(_T("CONFIG"), _T("DST_UPDEATE_PATH"),  "" , CGlobal::dstUpdatePath, MAX_PATH, CGlobal::PROGRAM_INI_FULLPATH);
 		m_dstUpdateAppPath.Format(_T("%s"),CGlobal::dstUpdatePath);
+
+		m_LogFileSaveInterval = CGlobal::INI_LOGFILE_SAVE_INTERVAL;
 
 		UpdateData(FALSE);
 	}
@@ -1796,6 +1829,10 @@ void CKillProcessDlg::Write_INI(void)
 			//업데이트 할 디렉토리 쓰기
 			WritePrivateProfileString(_T("CONFIG"), _T("SRC_UPDEATE_PATH"),CGlobal::srcUpdatePath, CGlobal::PROGRAM_INI_FULLPATH);
 			WritePrivateProfileString(_T("CONFIG"), _T("DST_UPDEATE_PATH"),CGlobal::dstUpdatePath,CGlobal::PROGRAM_INI_FULLPATH);
+
+			//로그 삭제 주기.
+			_stprintf_s(buf,_countof(buf), _T("%d"), m_LogFileSaveInterval);
+			WritePrivateProfileString(_T("DEBUG_LOG"), _T("LOG_COGNITION_SAVE_INTERVAL"),  buf, CGlobal::PROGRAM_INI_FULLPATH);
 
 			WritePrivateProfileString(NULL,NULL,NULL,CGlobal::PROGRAM_INI_FULLPATH);
 		}
@@ -2056,9 +2093,20 @@ BOOL CKillProcessDlg::OnCopyData(CWnd* pWnd, COPYDATASTRUCT* pCopyDataStruct)
 
 		if(m_pcds->cbData == sizeof(WATCHDOG_MSG))
 		{
-			CopyMemory(&m_wdMsg,m_pcds->lpData,m_pcds->cbData);
+			PWATCHDOG_MSG pWdMsg = new WATCHDOG_MSG();
+			if(pWdMsg)
+			{
+				CopyMemory(pWdMsg,m_pcds->lpData,m_pcds->cbData);
 
-			PostMessage(WM_PROC_ALIVE,(WPARAM)&m_wdMsg, NULL);
+				PostMessage(WM_PROC_ALIVE,(WPARAM)pWdMsg, NULL);
+			}
+			else
+			{
+				TCHAR szLog[MAX_PATH];
+				_stprintf_s(szLog,_countof(szLog),_T("WATCHDOG_MSG 메시지 메모리 할당 에러!\r\n"));
+				LSITS_Write_LogFile(LOG_ERROR,szLog);
+			}
+			
 		}
 	}
 	catch (CMemoryException* e)
@@ -2220,7 +2268,7 @@ void CKillProcessDlg::OnAppExit(void)
 {
 	try{
 		m_myTray.DelTrayIcon(GetSafeHwnd());
-		LSITS_Write_ProgramLogFile(_T("OnAppExit Program closed \r\n"));
+		LSITS_Write_LogFile(LOG_PROG,_T("OnAppExit Program closed \r\n"));
 	}
 	catch (CMemoryException* e)
 	{
@@ -2323,6 +2371,10 @@ LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
 						{
 							pInfo->curWaitSecond = 0;
 
+							TCHAR szLog[MAX_PATH];
+							_stprintf_s(szLog,_countof(szLog),_T("Refresh %s\r\n"),procname);
+							LSITS_Write_LogFile(LOG_PROG,szLog);
+
 							if(pInfo->useWatchdog == TRUE)
 							{
 								for(int iter = 0; iter < m_monProcList.GetItemCount();iter++)
@@ -2343,6 +2395,8 @@ LRESULT CKillProcessDlg::OnProcAliveFunc(WPARAM wParam, LPARAM lParam)
 				}
 			}
 
+
+			delete pWdMsg;
 
 		}
 	}
@@ -2420,7 +2474,7 @@ void CKillProcessDlg::OnNMCustomdrawMonProcessList(NMHDR *pNMHDR, LRESULT *pResu
 					{
 						if(pInfo->useWatchdog == TRUE &&  pInfo->isActive == TRUE && pInfo->curWaitSecond <= 1000)
 						{
-							pDraw->clrText = 0xff; //붉은 색으로
+							pDraw->clrText = 0xff; //빨강(red) 색으로
 							pDraw->clrTextBk = 0xffffff; 
 						}
 						else
@@ -2475,7 +2529,7 @@ void CKillProcessDlg::OnClose()
 	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
 	try{
 		m_myTray.DelTrayIcon(GetSafeHwnd());
-		LSITS_Write_ProgramLogFile(_T("OnClose Program closed \r\n"));
+		LSITS_Write_LogFile(LOG_PROG,_T("OnClose Program closed \r\n"));
 	}
 	catch (CMemoryException* e)
 	{
@@ -2504,4 +2558,247 @@ void CKillProcessDlg::OnClose()
 CKillProcessDlg::~CKillProcessDlg()
 {
 
+}
+
+BOOL CKillProcessDlg::CreateThead( void )
+{
+	is_DEL_Run = TRUE;
+
+	DelDataThread = AfxBeginThread(DelDataThreadFunc,	      // thread function.
+		(CKillProcessDlg *)this,		              // thread function parameter.
+		THREAD_PRIORITY_IDLE,0,CREATE_SUSPENDED       // thread priority.											
+		);
+
+	// thread 생성에 대한 결과를 전달.
+	if(DelDataThread == NULL) {
+		LSITS_Write_LogFile(LOG_ERROR,_T("DelData Thread생성 실패.\r\n"));
+	}
+	else {
+		LSITS_Write_LogFile(LOG_PROG,_T("DelData Thread생성 성공.\r\n"));
+		::DuplicateHandle(GetCurrentProcess(), DelDataThread->m_hThread,
+			GetCurrentProcess(), &m_hThreadD, 0 ,FALSE, DUPLICATE_SAME_ACCESS);
+		DelDataThread->ResumeThread();
+	}
+
+	return TRUE;
+}
+
+int CKillProcessDlg::StopThread( void )
+{
+	MSG msg;
+
+	if(DelDataThread)
+		DelDataThread->m_bAutoDelete = TRUE;
+	is_DEL_Run = FALSE;
+	SetEvent(m_hDelEvent);
+
+	while(TRUE)
+	{
+		DWORD dwExitCode;
+
+		BOOL retVal = ::GetExitCodeThread(m_hThreadD,&dwExitCode);
+		if(retVal == FALSE)
+		{
+			break;
+		}
+		if(dwExitCode == STILL_ACTIVE)
+		{
+			SetEvent(m_hDelEvent);
+			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+			{
+				DispatchMessage(&msg);					
+			}
+			Sleep(100);
+		}
+		else
+		{
+			LSITS_Write_LogFile(LOG_PROG,_T("DelData Thread 종료.\r\n"));
+			::CloseHandle(m_hThreadD);
+			DelDataThread = NULL;
+			break;
+		}
+	}
+	return 0;
+}
+
+/**
+* @author 윤경섭
+* @fn  UINT DelDataThreadFunc(LPVOID lpParam)
+* @param LPVOID lpParam
+* @remark 데이터 삭제 쓰레드
+* @return UINT
+* @date 19/12/03
+*/
+UINT DelDataThreadFunc(LPVOID lpParam)
+{
+	POSITION pos,pos1;
+	CKillProcessDlg *pKillProcessDlg =  (CKillProcessDlg *)lpParam;
+	while(pKillProcessDlg->is_DEL_Run)
+	{
+		const DWORD dwRet = WaitForSingleObject(pKillProcessDlg->m_hDelEvent, INFINITE);
+
+		if(pKillProcessDlg->is_DEL_Run == FALSE)
+			break;
+
+		///자정마다 데이터를 삭제한다.
+		try
+		{
+
+			TCHAR TmpPath[MAX_PATH];
+			TCHAR TargetPath[MAX_PATH];
+			HANDLE hFind;
+			WIN32_FIND_DATA fd;
+			TCHAR TemDir[MAX_PATH];
+
+			CTimeSpan ts;
+			CTime NowTime;
+			NowTime = CTime::GetCurrentTime();
+
+			_stprintf_s(TemDir,_countof(TemDir),_T("디렉토리를 삭제 시작\r\n"));
+			LSITS_Write_LogFile(LOG_PROG,TemDir);
+
+
+
+			try
+			{
+				//먼저 로그 디렉토리를 지정한다.
+				_stprintf_s(TmpPath, _countof(TmpPath), _T("%s%s\\*.*"), CGlobal::Program_PATH, _T("log"));
+
+				if((hFind = ::FindFirstFile(TmpPath,&fd)) != INVALID_HANDLE_VALUE)
+				{
+					do{
+						Sleep(100);
+
+						if(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY){
+							CString strComp = (LPCTSTR) &fd.cFileName;
+							if((strComp != _T(".")) && (strComp != _T(".."))){
+
+								ULONG val;
+								val = _ttol((TCHAR *)LPCTSTR(strComp));
+								if(val)
+								{
+									char year[5]={0,};
+									char mon[3]={0,};
+									char day[3] ={0,};
+									int nyear,nmon,nday;
+									memcpy(year,(char *)LPCTSTR(strComp),4);
+									nyear = _ttoi(year);
+									memcpy(mon,(char *)LPCTSTR(strComp)+4,2);
+									nmon = _ttoi(mon);
+
+									memcpy(day,(char *)LPCTSTR(strComp)+6,2);
+									nday = _ttoi(day);
+
+									CTime ct(nyear,nmon,nday,0,0,0); 
+
+									ts = NowTime - ct;
+									if(ts.GetDays() > CGlobal::INI_LOGFILE_SAVE_INTERVAL)
+									{
+										//로그를 뿌리면 중간에 멈추는 문제가 있다. 그래서 모든 로그를 삭제한다.
+										_stprintf_s(TemDir,_countof(TemDir),_T("디렉토리를 삭제 추가.-log\\%s\r\n"),strComp);
+										LSITS_Write_LogFile(LOG_PROG,TemDir);
+
+										_stprintf_s(TargetPath, _countof(TargetPath), _T("%s%s\\%s"), CGlobal::Program_PATH, _T("log"),strComp);
+										TCHAR *pPath = new TCHAR[MAX_PATH];
+										_tcscpy(pPath,TargetPath);
+										pKillProcessDlg->m_RemoveDirList.AddTail(pPath);
+									}
+								}
+							}
+						}
+					}while(::FindNextFile(hFind, &fd));
+					::FindClose(hFind);	
+				}
+			}
+			catch (CMemoryException* e)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+				TCHAR szException[1024] = {0, };
+				e->GetErrorMessage(szException,sizeof(szException));
+				LSITS_Write_ErrorLogFile(szException);
+			}
+			catch (CException* e)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+				TCHAR szException[1024] = {0, };
+				e->GetErrorMessage(szException,sizeof(szException));
+				LSITS_Write_ErrorLogFile(szException);
+			}
+			catch (...)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			}
+
+
+
+			try
+			{
+				for(pos = pKillProcessDlg->m_RemoveDirList.GetHeadPosition(); pos != NULL;)
+				{
+					TCHAR *pTargetPath = (TCHAR *)pKillProcessDlg->m_RemoveDirList.GetAt(pos);
+					if(PathIsDirectory(pTargetPath))
+					{
+						_stprintf_s(TemDir,_countof(TemDir),_T("디렉토리를 삭제.-log\\%s\r\n"),pTargetPath);
+						LSITS_Write_LogFile(LOG_PROG,TemDir);
+						_tcscat(pTargetPath,"\\*.*");
+						DeleteDir(pTargetPath);
+					}
+
+					pos1 = pos;
+					pKillProcessDlg->m_RemoveDirList.GetNext(pos);
+					pKillProcessDlg->m_RemoveDirList.RemoveAt(pos1);
+					delete [] pTargetPath;
+				}
+			}
+			catch (CMemoryException* e)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+				TCHAR szException[1024] = {0, };
+				e->GetErrorMessage(szException,sizeof(szException));
+				LSITS_Write_ErrorLogFile(szException);
+			}
+			catch (CException* e)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+				TCHAR szException[1024] = {0, };
+				e->GetErrorMessage(szException,sizeof(szException));
+				LSITS_Write_ErrorLogFile(szException);
+			}
+			catch (...)
+			{
+				DWORD dwError = GetLastError();
+				LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			}
+			LSITS_Write_LogFile(LOG_PROG,_T("디렉토리 삭제완료\r\n"));
+		}
+		catch (CMemoryException* e)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			TCHAR szException[1024] = {0, };
+			e->GetErrorMessage(szException,sizeof(szException));
+			LSITS_Write_ErrorLogFile(szException);
+		}
+		catch (CException* e)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+			TCHAR szException[1024] = {0, };
+			e->GetErrorMessage(szException,sizeof(szException));
+			LSITS_Write_ErrorLogFile(szException);
+		}
+		catch (...)
+		{
+			DWORD dwError = GetLastError();
+			LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
+		}  //전체 try catch 완료
+
+	}//while
+
+	return 0;
 }

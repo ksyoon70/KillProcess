@@ -30,7 +30,7 @@ typedef struct _WATCHDOG_MSG
 {
 	TCHAR processName[MAX_PATH];
 	int strlen;
-}WATCHDOG_MSG;
+}WATCHDOG_MSG, *PWATCHDOG_MSG;
 #pragma pack (pop)
 
 /// CKillProcessDlg 대화 상자
@@ -122,6 +122,8 @@ public:
 	afx_msg LRESULT OnProcAliveFunc(WPARAM wParam, LPARAM lParam);
 	// 프로세스 업데이트 주기
 	UINT m_RefreshProcessTime;
+	//로그 삭제 주기
+	UINT m_LogFileSaveInterval;
 
 	// 트레이 아이콘 관리용 객체
 	CTrayIconMng m_myTray;
@@ -131,9 +133,24 @@ public:
 	void OnAppExit(void);
 	void OnDialogShow(void);
 
+
+	CWinThread *DelDataThread; 
+	BOOL is_DEL_Run;
+	HANDLE m_hThreadD;
+	HANDLE 	m_hDelEvent;
+
+	// 인식 쓰레드를 만든다
+	BOOL CreateThead(void);
+	// 인식쓰레드를 멈춘다
+	int StopThread(void);
+
+	CXPtrList m_RemoveDirList;		//디렉토리 삭제 리스트
+
 private:
 	// 초기 트레이 상태
 	BOOL m_InitTray;
+
+	UINT oldDay;
 public:
 	// 버전표시
 	CStatic m_Version;

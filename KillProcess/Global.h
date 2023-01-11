@@ -1,10 +1,14 @@
 #pragma once
 
+#define LOG_PROG		  1       // 프로그램로그 저장
+#define LOG_ERROR		  2
+
 extern void CreateDir(char* Path);
 extern void GetCurrentDate(char *return_Date);
-extern void LSITS_Write_ProgramLogFile(char *format, ...);
+extern void LSITS_Write_LogFile(int param_KindOfLog, char *format, ...);
 extern void LSITS_Write_ErrorLogFile(char *format, ...);
 extern void LSITS_WriteExceptionFile(TCHAR *filename, DWORD line, DWORD dwError);
+extern BOOL DeleteDir(CString dir);
 
 class CGlobal
 {
@@ -17,8 +21,10 @@ public:
 	static TCHAR srcUpdatePath[MAX_PATH];			/// 업데이트할 소스 폴더+filename
 	static TCHAR dstUpdatePath[MAX_PATH];			/// 업데이틀할 목적 폴더
 
+	static UINT INI_LOGFILE_SAVE_INTERVAL;
+
 	static BOOL GetPath(TCHAR *src, TCHAR *dst);
 };
 
-const static TCHAR *PROGRAM_VERSION =  _T("VER 1.01.20220906_1");
+const static TCHAR *PROGRAM_VERSION =  _T("VER 1.01.20230111_1");
 
