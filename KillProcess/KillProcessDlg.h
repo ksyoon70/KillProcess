@@ -129,7 +129,7 @@ public:
 	CTrayIconMng m_myTray;
 	// 트레이 아이콘 보이기/숨기기 여부
 	bool m_bHide;
-	long OnTrayIcon(WPARAM wParam, LPARAM lParam);
+	LRESULT OnTrayIcon(WPARAM wParam, LPARAM lParam);
 	void OnAppExit(void);
 	void OnDialogShow(void);
 

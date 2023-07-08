@@ -2233,7 +2233,7 @@ void CKillProcessDlg::OnBnClickedDestBrowseFileBtn()
 
 
 //트레이 아이콘을 클릭했을 때의 메시지 핸들러
-long CKillProcessDlg::OnTrayIcon(WPARAM wParam, LPARAM lParam)
+LRESULT CKillProcessDlg::OnTrayIcon(WPARAM wParam, LPARAM lParam)
 {
 	try{
 		m_myTray.ProcTrayMsg(GetSafeHwnd(), wParam, lParam);
@@ -2260,7 +2260,7 @@ long CKillProcessDlg::OnTrayIcon(WPARAM wParam, LPARAM lParam)
 		LSITS_WriteExceptionFile(__FILE__,__LINE__,dwError);
 	}
 	
-	return 0;
+	return TRUE;
 }
 
 //트레이 아이콘 팝업메뉴의 종료 메뉴 메시지 핸들러
